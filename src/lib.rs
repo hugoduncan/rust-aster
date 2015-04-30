@@ -16,6 +16,7 @@ pub mod invoke;
 pub mod item;
 pub mod lifetime;
 pub mod lit;
+pub mod mac;
 pub mod method;
 pub mod name;
 pub mod pat;

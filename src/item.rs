@@ -12,6 +12,7 @@ use fn_decl::FnDeclBuilder;
 use generics::GenericsBuilder;
 use ident::ToIdent;
 use invoke::{Invoke, Identity};
+use mac::MacBuilder;
 use path::PathBuilder;
 use struct_def::{StructDefBuilder, StructFieldBuilder};
 use ty::TyBuilder;
@@ -156,6 +157,13 @@ impl<F> ItemBuilder<F>
             generics: generics,
         }
 
+    }
+
+    pub fn mac(self) -> ItemMacBuilder<F>
+    {
+        ItemMacBuilder {
+            builder: self,
+        }
     }
 }
 
@@ -634,5 +642,48 @@ impl<F> Invoke<P<ast::Ty>> for ItemTyBuilder<F>
 
     fn invoke(self, ty: P<ast::Ty>) -> F::Result {
         self.build_ty(ty)
+    }
+}
+
+//////////////////////////////////////////////////////////////////////////////
+
+/// A builder for macro invocation items.
+///
+/// Specifying the macro path returns a `MacBuilder`, which is used to
+/// add expressions to the macro invocation.
+pub struct ItemMacBuilder<F> {
+    builder: ItemBuilder<F>,
+}
+
+impl<F> ItemMacBuilder<F>
+    where F: Invoke<P<ast::Item>>,
+{
+    pub fn path(self) -> PathBuilder<Self> {
+        PathBuilder::new_with_callback(self)
+    }
+
+    pub fn build(self, mac: ast::Mac) -> F::Result {
+        let item_mac = ast::ItemMac(mac);
+        self.builder.build_item_(ast::Ident::new(ast::Name(0)), item_mac)
+    }
+}
+
+impl<F> Invoke<ast::Path> for ItemMacBuilder<F>
+    where F: Invoke<P<ast::Item>>,
+{
+    type Result = MacBuilder<ItemMacBuilder<F>>;
+
+    fn invoke(self, path: ast::Path) -> MacBuilder<Self> {
+        MacBuilder::new_with_callback(self).path(path)
+    }
+}
+
+impl<F> Invoke<ast::Mac> for ItemMacBuilder<F>
+    where F: Invoke<P<ast::Item>>,
+{
+    type Result = F::Result;
+
+    fn invoke(self, mac: ast::Mac) -> F::Result {
+        self.build(mac)
     }
 }
