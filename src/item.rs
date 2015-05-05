@@ -11,10 +11,12 @@ use block::BlockBuilder;
 use fn_decl::FnDeclBuilder;
 use generics::GenericsBuilder;
 use ident::ToIdent;
+// use impl_item::ImplItemBuilder;
 use invoke::{Invoke, Identity};
 use mac::MacBuilder;
 use path::PathBuilder;
 use struct_def::{StructDefBuilder, StructFieldBuilder};
+use trait_ref::TraitRefBuilder;
 use ty::TyBuilder;
 use variant::{VariantBuilder, VariantTupleBuilder, VariantStructBuilder};
 
@@ -175,6 +177,20 @@ impl<F> ItemBuilder<F>
             builder: self,
             id: id,
         }
+    }
+
+    pub fn impl_(self) -> TyBuilder<ItemImplDeclBuilder<F>>
+    {
+        let id = Self::dummy_ident();
+        TyBuilder::new_with_callback(ItemImplDeclBuilder {
+            builder: self,
+            id: id,
+        })
+    }
+
+    /// Return a dummy Ident, suitable for anonymous items
+    fn dummy_ident() -> ast::Ident {
+        ast::Ident::new(ast::Name(0))
     }
 }
 
@@ -718,5 +734,120 @@ impl<F> ItemExternCrateBuilder<F>
     pub fn build(self) -> F::Result {
         let extern_ = ast::ItemExternCrate(None);
         self.builder.build_item_(self.id, extern_)
+    }
+}
+
+//////////////////////////////////////////////////////////////////////////////
+
+pub struct ItemImplDeclBuilder<F> {
+    builder: ItemBuilder<F>,
+    id: ast::Ident,
+}
+
+impl<F> Invoke<P<ast::Ty>> for ItemImplDeclBuilder<F>
+    where F: Invoke<P<ast::Item>>,
+{
+    type Result = ItemImplBuilder<F>;
+
+    fn invoke(self, ty: P<ast::Ty>) -> ItemImplBuilder<F> {
+        let generics = GenericsBuilder::new().build();
+
+        ItemImplBuilder {
+            builder: self.builder,
+            id: self.id,
+            unsafety: ast::Unsafety::Normal,
+            polarity: ast::ImplPolarity::Positive,
+            generics: generics,
+            trait_: None,
+            ty: ty,
+            items: vec![],
+        }
+    }
+}
+
+pub struct ItemImplBuilder<F> {
+    builder: ItemBuilder<F>,
+    id: ast::Ident,
+    unsafety: ast::Unsafety,
+    polarity: ast::ImplPolarity,
+    generics: ast::Generics,
+    trait_: Option<ast::TraitRef>,
+    ty: P<ast::Ty>,
+    items: Vec<P<ast::ImplItem>>,
+}
+
+impl<F> ItemImplBuilder<F>
+    where F: Invoke<P<ast::Item>>,
+{
+    pub fn generics(self) -> GenericsBuilder<Self> {
+        GenericsBuilder::new_with_callback(self)
+    }
+
+    /// Make the impl unsafe.
+    pub fn unsafe_(mut self) -> Self {
+        self.unsafety = ast::Unsafety::Unsafe;
+        self
+    }
+
+    /// Make the trait reference negative, impl !Trait for Type.
+    pub fn negative(mut self) -> Self {
+        self.polarity = ast::ImplPolarity::Negative;
+        self
+    }
+
+    /// Specify the trait to implement.
+    pub fn trait_(self) -> PathBuilder<TraitRefBuilder<Self>> {
+        TraitRefBuilder::new_with_callback(self)
+    }
+
+
+    /// Add an ImplItem to the impl
+    pub fn with_item(mut self, item: P<ast::ImplItem>) -> Self {
+        self.items.push(item);
+        self
+    }
+
+    /// Add a sequence of ImplItem to the impl
+    pub fn with_items<I>(mut self, iter: I) -> Self
+        where I: IntoIterator<Item=P<ast::ImplItem>>,
+    {
+        self.items.extend(iter.into_iter());
+        self
+    }
+
+    // /// Build an ImplItem for the impl
+    // pub fn item<I>(self, id: I) -> ImplItemBuilder<Self>
+    //     where I: ToIdent,
+    // {
+    //     ImplItemBuilder::new_with_callback(self, id)
+    // }
+
+    pub fn build(self) -> F::Result {
+        let item_ = ast::ItemImpl(
+            self.unsafety, self.polarity, self.generics,
+            self. trait_, self.ty, self.items);
+        self.builder.build_item_(self.id, item_)
+    }
+}
+
+impl<F> Invoke<ast::Generics> for ItemImplBuilder<F>
+    where F: Invoke<P<ast::Item>>,
+{
+    type Result = Self;
+
+    fn invoke(mut self, generics: ast::Generics) -> Self {
+        self.generics = generics;
+        self
+    }
+}
+
+impl<F> Invoke<ast::TraitRef> for ItemImplBuilder<F>
+    where F: Invoke<P<ast::Item>>,
+{
+    type Result = Self;
+
+    fn invoke(mut self, trait_ref: ast::TraitRef) -> Self {
+        self.trait_ = Some(trait_ref);
+        self
     }
 }

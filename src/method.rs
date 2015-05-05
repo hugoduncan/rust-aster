@@ -4,6 +4,7 @@ use syntax::codemap::{DUMMY_SP, Span, respan};
 use syntax::ptr::P;
 
 use block::BlockBuilder;
+use fn_decl::FnDeclBuilder;
 use generics::GenericsBuilder;
 use ident::ToIdent;
 use invoke::{Invoke, Identity};
@@ -89,13 +90,15 @@ impl<F> Invoke<ast::Generics> for MethodBuilder<F>
 impl<F> Invoke<ast::ExplicitSelf> for MethodBuilder<F>
     where F: Invoke<P<ast::ImplItem>>,
 {
-    type Result = MethodSelfBuilder<F>;
+    type Result = FnDeclBuilder<MethodSelfBuilder<F>>;
 
-    fn invoke(self, explicit_self: ast::ExplicitSelf) -> MethodSelfBuilder<F> {
-        MethodSelfBuilder {
-            builder: self,
-            explicit_self: explicit_self,
-        }
+    fn invoke(self, explicit_self: ast::ExplicitSelf) -> FnDeclBuilder<MethodSelfBuilder<F>> {
+        FnDeclBuilder::new_with_callback(
+            MethodSelfBuilder {
+                builder: self,
+                explicit_self: explicit_self,
+            }
+            )
     }
 }
 

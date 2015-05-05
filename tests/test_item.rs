@@ -523,3 +523,30 @@ fn test_extern_crate() {
         })
     );
 }
+
+
+#[test]
+fn test_impl() {
+    use aster::name::ToName;
+
+    let builder = AstBuilder::new();
+    let item = builder.item()
+        .impl_()
+        .id("MyType")
+        .with_items(
+            vec![
+                builder.method("m").self_().ref_()
+                    .arg("self").ty().id("i32")
+                    .default_return()
+                    .with_stmt(builder.stmt().expr().unit())
+                    .build()
+                    ]
+            )
+        .build();
+
+    println!("Result is {}", pprust::item_to_string(&item));
+    assert_eq!(
+        &pprust::item_to_string(&item)[..],
+        "impl MyType {\n    fn m(&self) { (); }\n}"
+    );
+}
