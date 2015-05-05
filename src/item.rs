@@ -168,6 +168,19 @@ impl<F> ItemBuilder<F>
         }
     }
 
+    pub fn mod_<T>(self, id: T) -> ItemModBuilder<F>
+        where T: ToIdent,
+    {
+        let id = id.to_ident();
+
+        ItemModBuilder {
+            builder: self,
+            id: id,
+            inner: DUMMY_SP,
+            items: vec![]
+        }
+    }
+
     pub fn extern_crate<T>(self, id: T) -> ItemExternCrateBuilder<F>
         where T: ToIdent,
     {
@@ -712,6 +725,59 @@ impl<F> Invoke<ast::Mac> for ItemMacBuilder<F>
 
     fn invoke(self, mac: ast::Mac) -> F::Result {
         self.build(mac)
+    }
+}
+
+//////////////////////////////////////////////////////////////////////////////
+
+/// A builder for macro invocation items.
+///
+/// Specifying the macro path returns a `ModBuilder`, which is used to
+/// add expressions to the macro invocation.
+pub struct ItemModBuilder<F> {
+    builder: ItemBuilder<F>,
+    id: ast::Ident,
+    inner: Span,
+    items: Vec<P<ast::Item>>,
+}
+
+impl<F> ItemModBuilder<F>
+    where F: Invoke<P<ast::Item>>,
+{
+    pub fn item(self) -> ItemBuilder<Self> {
+        ItemBuilder::new_with_callback(self)
+    }
+
+    pub fn with_item(mut self, item: P<ast::Item>) -> Self {
+        self.items.push(item);
+        self
+    }
+
+    pub fn with_items<I>(mut self, iter: I) -> Self
+        where I: IntoIterator<Item=P<ast::Item>>,
+    {
+        self.items.extend(iter);
+        self
+    }
+
+    pub fn build(self) -> F::Result {
+        self.builder.build_item_(
+            self.id,
+            ast::Item_::ItemMod(ast::Mod{
+                inner: self.inner,
+                items: self.items,
+            }))
+    }
+}
+
+
+impl<F> Invoke<P<ast::Item>> for ItemModBuilder<F>
+    where F: Invoke<P<ast::Item>>,
+{
+    type Result = Self;
+
+    fn invoke(self, item: P<ast::Item>) -> Self {
+        self.with_item(item)
     }
 }
 
