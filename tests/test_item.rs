@@ -527,8 +527,6 @@ fn test_extern_crate() {
 
 #[test]
 fn test_impl() {
-    use aster::name::ToName;
-
     let builder = AstBuilder::new();
     let item = builder.item()
         .impl_()
