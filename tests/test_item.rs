@@ -548,3 +548,19 @@ fn test_impl() {
         "impl MyType {\n    fn m(&self) { (); }\n}"
     );
 }
+
+
+#[test]
+fn test_mod() {
+    let builder = AstBuilder::new();
+    let item = builder.item()
+        .mod_("mymod")
+        .build();
+
+    println!("mod item is {:?}", item);
+    println!("Result is {}", pprust::item_to_string(&item));
+    assert_eq!(
+        &pprust::item_to_string(&item)[..],
+        "mod mymod;"
+    );
+}
